@@ -9,7 +9,7 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-set(TEST_TARGETS huffman_coding)
+set(TEST_TARGETS huffman_coding hash_table)
 set(TEST_SRC_FILES ${TEST_TARGETS})
 list(TRANSFORM TEST_SRC_FILES APPEND .cpp)
 

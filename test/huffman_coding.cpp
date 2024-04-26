@@ -25,6 +25,8 @@ TEST(HuffmanCoding, EncodeDecode)
     encoder << sample_text;
     encoder.finalize();
 
+    EXPECT_LT(oss.str().size(), sizeof(sample_text) / sizeof(sample_text[0]));
+
     std::istringstream iss {oss.str(), std::ios_base::binary};
     HuffmanStringDecoder decoder {iss, *huffman_tree};
     std::string decoded_sample_text;
