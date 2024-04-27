@@ -6,36 +6,11 @@
 #include <utility>
 #include <concepts>
 
-
-template<typename T>
-concept RehashPolicy = requires (T&& policy, size_t nr_buckets, size_t nr_elements, size_t nr_inserts)
-{
-    { policy.need_rehash(nr_buckets, nr_elements, nr_inserts) } -> std::same_as<std::pair<bool, size_t>>;
-    { policy.get_nr_buckets_for_elements(nr_elements) } -> std::same_as<size_t>;
-    { policy.next_nr_buckets(nr_buckets) } -> std::same_as<size_t>;
-};
-
-class DummyRehashPolicy {
-public:
-    std::pair<bool, size_t> need_rehash(size_t nr_buckets, size_t nr_elements, size_t nr_inserts)
-    {
-        return std::make_pair(true, nr_buckets + nr_elements);
-    }
-
-    size_t get_nr_buckets_for_elements(size_t nr_elements)
-    {
-        return nr_elements;
-    }
-
-    size_t next_nr_buckets(size_t nr_buckets)
-    {
-        return nr_buckets;
-    }
-};
+#include "hash_table_policy.h"
 
 
 template<typename Key, typename Value, typename Hash = std::hash<Key>,
-    typename KeyEqual = std::equal_to<Key>, RehashPolicy RehashPolicy = DummyRehashPolicy>
+    typename KeyEqual = std::equal_to<Key>, RehashPolicy RehashPolicy = Power2RehashPolicy>
 class HashTable {
 private:
     struct Node {
@@ -239,34 +214,64 @@ public:
         return 1;
     }
 
-    Iterator begin()
+    inline Iterator begin()
     {
         return Iterator(this, true);
     }
 
-    Iterator end()
+    inline Iterator end()
     {
         return Iterator(this, false);
     }
 
-    const Iterator cbegin() const
+    inline const Iterator cbegin() const
     {
         return Iterator(this, true);
     }
 
-    const Iterator cend() const
+    inline const Iterator cend() const
     {
         return Iterator(this, false);
     }
 
-    Value& operator[](const Key& key)
+    inline Value& operator[](const Key& key)
     {
         return insert(std::make_pair(key, Value())).first->second;
     }
 
-    size_t size() const
+    inline size_t size() const
     {
         return nr_elements;
+    }
+
+    void reserve(size_t nr_elements)
+    {
+        size_t nr_buckets = rehash_policy.get_nr_buckets_for_elements(nr_elements);
+        if (nr_buckets > buckets.size())
+            rehash(nr_buckets);
+    }
+
+    inline size_t bucket(const Key& key) const
+    {
+        return hasher(key) % buckets.size();
+    }
+
+    size_t bucket_size(size_t index) const
+    {
+        Node *node = buckets[index];
+        if (!node)
+            return 0;
+        size_t size = 0;
+        do {
+            ++size;
+            node = node->next;
+        } while (node != buckets[index]);
+        return size;
+    }
+
+    float load_factor() const
+    {
+        return nr_elements / (float)buckets.size();
     }
 
 private:
@@ -274,6 +279,8 @@ private:
     {
         if (new_nr_buckets == 0)
             new_nr_buckets = 1;
+        if (new_nr_buckets == buckets.size())
+            return;
 
         std::vector<Node *> old_buckets (new_nr_buckets, nullptr);
         old_buckets.swap(buckets);
@@ -336,3 +343,4 @@ private:
     KeyEqual key_equal;
     RehashPolicy rehash_policy;
 };
+
