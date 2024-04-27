@@ -6,21 +6,30 @@
 #include <utility>
 #include <concepts>
 
-#include "error.h"
-
 
 template<typename T>
 concept RehashPolicy = requires (T&& policy, size_t nr_buckets, size_t nr_elements, size_t nr_inserts)
 {
     { policy.need_rehash(nr_buckets, nr_elements, nr_inserts) } -> std::same_as<std::pair<bool, size_t>>;
+    { policy.get_nr_buckets_for_elements(nr_elements) } -> std::same_as<size_t>;
+    { policy.next_nr_buckets(nr_buckets) } -> std::same_as<size_t>;
 };
 
 class DummyRehashPolicy {
 public:
-    bool rehash_done = false;
     std::pair<bool, size_t> need_rehash(size_t nr_buckets, size_t nr_elements, size_t nr_inserts)
     {
-        return std::make_pair(!std::exchange(rehash_done, true), 23);
+        return std::make_pair(true, nr_buckets + nr_elements);
+    }
+
+    size_t get_nr_buckets_for_elements(size_t nr_elements)
+    {
+        return nr_elements;
+    }
+
+    size_t next_nr_buckets(size_t nr_buckets)
+    {
+        return nr_buckets;
     }
 };
 
@@ -182,10 +191,22 @@ public:
 
     std::pair<Iterator, bool> insert(std::pair<Key, Value>&& pair)
     {
+        const auto hash = hasher(pair.first);
+        size_t index = hash % buckets.size();
+
+        Node *prev = find_node_in_bucket(pair.first, buckets[index]);
+        if (prev)
+            return std::make_pair(Iterator(this, index, prev), false);
+
         auto [need_rehash, new_nr_buckets] = rehash_policy.need_rehash(buckets.size(), nr_elements, 1);
-        if (need_rehash)
+        if (need_rehash) {
             rehash(new_nr_buckets);
-        return insert__no_rehash(std::move(pair));
+            index = hash % buckets.size();
+        }
+
+        prev = insert_node_into_bucket(buckets[index], new Node(std::move(pair), nullptr));
+        ++nr_elements;
+        return std::make_pair(Iterator(this, index, prev), true);
     }
 
     inline std::pair<Iterator, bool> insert(const std::pair<Key, Value>& pair)
@@ -243,15 +264,16 @@ public:
         return insert(std::make_pair(key, Value())).first->second;
     }
 
+    size_t size() const
+    {
+        return nr_elements;
+    }
+
 private:
     void rehash(size_t new_nr_buckets)
     {
-        if (new_nr_buckets == 0) {
-            if (nr_elements > 0)
-                throw Error<HashTable>("Invalid rehash request with zero number of buckets for non-zero number of elements.");
-            else
-                return;
-        }
+        if (new_nr_buckets == 0)
+            new_nr_buckets = 1;
 
         std::vector<Node *> old_buckets (new_nr_buckets, nullptr);
         old_buckets.swap(buckets);
@@ -269,17 +291,30 @@ private:
         }
     }
 
-    std::pair<Iterator, bool> insert__no_rehash(std::pair<Key, Value>&& pair)
+    Node *find_node_in_bucket(const Key& key, Node *bucket)
     {
-        size_t index = hasher(pair.first) % buckets.size();
-        Node *& bucket = buckets[index];
-        Node *const node = find_node_in_bucket(pair.first, bucket);
-        if (node)
-            return std::make_pair(Iterator(this, index, node), false);
+        if (!bucket)
+            return nullptr;
 
-        Node *prev = insert_node_into_bucket(bucket, new Node (std::move(pair), nullptr));
-        ++nr_elements;
-        return std::make_pair(Iterator(this, index, prev), true);
+        Node *node = bucket;
+        do {
+            if (key_equal(key, node->next->pair.first))
+                return node;
+        } while (node != bucket);
+
+        return nullptr;
+    }
+
+    static Node *insert_node_into_bucket(Node *&bucket, Node *new_node)
+    {
+        if (bucket) {
+            new_node->next = bucket->next;
+            bucket->next = new_node;
+        } else {
+            bucket = new_node;
+            new_node->next = new_node;
+        }
+        return bucket;
     }
 
     static void remove_node_from_bucket(Node *&bucket, Node *prev_node)
@@ -295,33 +330,7 @@ private:
         prev_node->next = node->next;
     }
 
-    static Node *insert_node_into_bucket(Node *&bucket, Node *new_node)
-    {
-        if (bucket) {
-            new_node->next = bucket->next;
-            bucket->next = new_node;
-        } else {
-            bucket = new_node;
-            new_node->next = new_node;
-        }
-        return bucket;
-    }
-
-    static inline Node *find_node_in_bucket(const Key& key, Node *bucket, const KeyEqual& key_equal = KeyEqual())
-    {
-        if (!bucket)
-            return nullptr;
-
-        Node *node = bucket;
-        do {
-            if (key_equal(key, node->next->pair.first))
-                return node;
-        } while (node != bucket);
-
-        return nullptr;
-    }
-
-    std::vector<Node *> buckets;
+    std::vector<Node *> buckets = {nullptr};
     size_t nr_elements = 0;
     Hash hasher;
     KeyEqual key_equal;

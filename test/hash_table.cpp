@@ -16,4 +16,5 @@ TEST(HashTable, Insertion)
         hash_table[key] = val;
         EXPECT_EQ(hash_table[key], val) << "while the key is " << key;
     }
+    EXPECT_EQ(hash_table.size(), 50);
 }
