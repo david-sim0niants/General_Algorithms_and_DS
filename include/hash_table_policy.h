@@ -19,14 +19,14 @@ concept RehashPolicy = requires (T&& policy, size_t nr_buckets, size_t nr_elemen
 
 class Power2RehashPolicy {
 public:
-    explicit Power2RehashPolicy(float max_load_factor = 1.0F)
+    explicit Power2RehashPolicy(float max_load_factor = 0.75F)
         : max_load_factor(max_load_factor)
     {}
 
     std::pair<bool, size_t> need_rehash(size_t nr_buckets, size_t nr_elements, size_t nr_inserts) const
     {
-        const size_t min_nr_buckets = get_nr_buckets_for_elements(nr_elements);
-        if (nr_buckets >= nr_elements / max_load_factor)
+        const size_t min_nr_buckets = get_nr_buckets_for_elements(nr_elements + nr_inserts);
+        if (nr_buckets >= min_nr_buckets)
             return std::make_pair(false, nr_buckets);
         else
             return std::make_pair(true, next_nr_buckets(min_nr_buckets));

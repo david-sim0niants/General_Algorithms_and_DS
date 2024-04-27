@@ -22,12 +22,12 @@ private:
         {}
     };
 
-public:
-    class Iterator {
+    template<typename ContainerPointer = HashTable *, typename NodePointer = Node *>
+    class Iterator_ {
     public:
-        Iterator() = default;
+        Iterator_() = default;
 
-        explicit Iterator(HashTable *container, bool begin = true) : container(container)
+        explicit Iterator_(HashTable *container, bool begin = true) : container(container)
         {
             if (!begin)
                 return;
@@ -38,7 +38,7 @@ public:
                 prev = nullptr;
         }
 
-        Iterator& operator++()
+        Iterator_& operator++()
         {
             prev = prev->next;
             if (prev != container->buckets[index])
@@ -51,55 +51,68 @@ public:
             return *this;
         }
 
-        Iterator operator++(int)
+        Iterator_ operator++(int)
         {
-            Iterator old = *this;
+            Iterator_ old = *this;
             ++*this;
             return old;
         }
 
-        bool operator==(const Iterator& other) const
+        bool operator==(const Iterator_& other) const
         {
             return (container == other.container || !container || !other.container) && prev == other.prev;
         }
 
-        bool operator!=(const Iterator& other) const
+        bool operator!=(const Iterator_& other) const
         {
             return !(*this == other);
         }
 
-        std::pair<Key, Value>& operator*()
+        auto& operator*()
         {
             return prev->next->pair;
         }
 
-        const std::pair<Key, Value>& operator*() const
+        const auto& operator*() const
         {
             return prev->next->pair;
         }
 
-        std::pair<Key, Value> *operator->()
+        auto *operator->()
         {
             return &prev->next->pair;
         }
 
-        const std::pair<Key, Value> *operator->() const
+        const auto *operator->() const
         {
             return &prev->next->pair;
+        }
+
+        inline ContainerPointer get_container() const
+        {
+            return container;
+        }
+
+        inline size_t get_bucket_index() const
+        {
+            return index;
         }
 
     private:
         friend class HashTable;
-        Iterator(HashTable *container, size_t index, Node *prev)
+        Iterator_(HashTable *container, size_t index, Node *prev)
             : container(container), index(index), prev(prev)
         {}
 
-        HashTable *container = nullptr;
+        ContainerPointer container = nullptr;
         size_t index = 0;
-        Node *prev = nullptr;
+        NodePointer prev = nullptr;
     };
 
 public:
+    using Iterator = Iterator_<>;
+    using ConstIterator = Iterator_<const HashTable *, const Node *>;
+
     HashTable() = default;
     explicit HashTable(Hash&& hasher, KeyEqual&& key_equal = KeyEqual(), RehashPolicy&& rehash_policy = RehashPolicy())
         : hasher(std::move(hasher)), key_equal(std::move(key_equal)), rehash_policy(std::move(rehash_policy))
@@ -189,10 +202,16 @@ public:
         return insert(std::pair<Key, Value>(pair));
     }
 
-    Iterator find(const Key& key) const
+    Iterator find(const Key& key)
     {
         size_t index = hasher(key) % buckets.size();
         return Iterator(this, index, find_node_in_bucket(key, buckets[index]));
+    }
+
+    const ConstIterator find(const Key& key) const
+    {
+        size_t index = hasher(key) % buckets.size();
+        return ConstIterator(this, index, find_node_in_bucket(key, buckets[index]));
     }
 
     Iterator erase(const Iterator it)
@@ -224,14 +243,24 @@ public:
         return Iterator(this, false);
     }
 
-    inline const Iterator cbegin() const
+    inline const ConstIterator begin() const
     {
-        return Iterator(this, true);
+        return ConstIterator(this, true);
     }
 
-    inline const Iterator cend() const
+    inline const ConstIterator end() const
     {
-        return Iterator(this, false);
+        return ConstIterator(this, false);
+    }
+
+    inline const ConstIterator cbegin() const
+    {
+        return ConstIterator(this, true);
+    }
+
+    inline const ConstIterator cend() const
+    {
+        return ConstIterator(this, false);
     }
 
     inline Value& operator[](const Key& key)
@@ -272,6 +301,11 @@ public:
     float load_factor() const
     {
         return nr_elements / (float)buckets.size();
+    }
+
+    float max_load_factor() const
+    {
+        return rehash_policy.get_max_load_factor();
     }
 
 private:
