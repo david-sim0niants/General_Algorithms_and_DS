@@ -79,6 +79,22 @@ TYPED_TEST(HashTableTest, Erasing)
         it = this->hash_table.erase(it);
         EXPECT_EQ(this->hash_table.size(), size - 1);
     }
+    for (size_t i = 0; i < this->hash_table.bucket_count(); ++i)
+        EXPECT_EQ(this->hash_table.bucket_size(i), 0);
+}
+
+TYPED_TEST(HashTableTest, Clearing)
+{
+    using Key   = std::tuple_element_t<0, TypeParam>;
+    using Value = std::tuple_element_t<1, TypeParam>;
+
+    for (int i = 0; i < 50; ++i)
+        this->hash_table[gen_sample_object<Key>()] = gen_sample_object<Value>();
+
+    this->hash_table.clear();
+    EXPECT_EQ(this->hash_table.size(), 0);
+    for (size_t i = 0; i < this->hash_table.bucket_count(); ++i)
+        EXPECT_EQ(this->hash_table.bucket_size(i), 0);
 }
 
 
