@@ -40,6 +40,15 @@ protected:
     static std::unique_ptr<BinaryTree> create_line_case_expected_tree();
     static std::unique_ptr<BinaryTree> create_triangle_case_expected_tree();
 
+    void create_random_rb_tree(int nr_nodes);
+
+    void cleanup_nodes();
+
+    void test_rb_tree_properties();
+    void _test_rb_tree_properties(RedBlackTree<int> *root, int& nr_black_nodes, int depth = 0);
+
+    static void print_rbtree(RedBlackTree<int> *root, int depth = 0);
+
     RedBlackTree<int> *root = nullptr;
     std::unordered_map<RedBlackTree<int> *, std::unique_ptr<RedBlackTree<int>>> nodes_container;
 };
@@ -142,32 +151,113 @@ std::unique_ptr<RedBlackTreeTest::BinaryTree> RedBlackTreeTest::create_triangle_
                 make_bt(4, Red)));
 }
 
+void RedBlackTreeTest::create_random_rb_tree(int nr_nodes)
+{
+    if (nr_nodes == 0) {
+        root = nullptr;
+        return;
+    }
 
-TEST_F(RedBlackTreeTest, InitialState)
+    root = create_node(rand());
+
+    while (--nr_nodes) {
+        RedBlackTree<int> *random_leave = root;
+        while (random_leave->get_left() && random_leave->get_right())
+            random_leave = rand() % 2 ? random_leave->get_left() : random_leave->get_right();
+        RedBlackTree<int> *node = create_node(rand());
+
+        if (random_leave->get_left() && rand() % 2)
+            random_leave->insert_right(node);
+        else
+            random_leave->insert_left(node);
+        root = root->get_root();
+    }
+}
+
+void RedBlackTreeTest::cleanup_nodes()
+{
+    nodes_container.clear();
+    root = nullptr;
+}
+
+void RedBlackTreeTest::test_rb_tree_properties()
+{
+    int nr_black_nodes = 0;
+    _test_rb_tree_properties(root, nr_black_nodes);
+}
+
+void RedBlackTreeTest::_test_rb_tree_properties(RedBlackTree<int> *root, int& nr_black_nodes, int depth)
+{
+    if (!root) {
+        nr_black_nodes = 1;
+        return;
+    }
+
+    ASSERT_FALSE(root->is_red() && root->is_root()) << "Depth: " << depth;
+    ASSERT_FALSE(root->is_red() && root->get_parent()->is_red()) << "Depth: " << depth
+        << " Value: " << root->value << " Parent value: " << root->get_parent()->value;
+
+    int left_nr_black_nodes = 0;
+    _test_rb_tree_properties(root->get_left(), left_nr_black_nodes, depth + 1);
+    if (!left_nr_black_nodes)
+        return;
+    int right_nr_black_nodes = 0;
+    _test_rb_tree_properties(root->get_right(), right_nr_black_nodes, depth + 1);
+    if (!right_nr_black_nodes)
+        return;
+
+    ASSERT_EQ(left_nr_black_nodes, right_nr_black_nodes) << "Depth: " << depth;
+
+    nr_black_nodes = root->is_black() + left_nr_black_nodes;
+}
+
+void RedBlackTreeTest::print_rbtree(RedBlackTree<int> *root, int depth)
+{
+    if (!root) {
+        std::cout << std::string(depth, '\t') << "(nil)" << std::endl;
+        return;
+    }
+
+    if (root->value % 100 == 73 && depth == 4) {
+        compare_trees(nullptr, nullptr);
+    }
+
+    print_rbtree(root->get_left(), depth + 1);
+    std::cout << std::string(depth, '\t') << (root->is_black() ? "\033[37mB" : "\033[31mR") + std::to_string(depth) + "\033[0m" << std::endl;
+    print_rbtree(root->get_right(), depth + 1);
+}
+
+
+TEST_F(RedBlackTreeTest, InitialStateInsertion)
 {
     create_initial_state();
     auto bt_root = create_initial_state_expected_tree();
     compare_trees(root, bt_root.get());
 }
 
-TEST_F(RedBlackTreeTest, RedUncleCase)
+TEST_F(RedBlackTreeTest, RedUncleCaseInsertion)
 {
     create_red_uncle_case();
     auto bt_root = create_red_uncle_case_expected_tree();
     compare_trees(root, bt_root.get());
 }
 
-TEST_F(RedBlackTreeTest, LineCase)
+TEST_F(RedBlackTreeTest, LineCaseInsertion)
 {
     create_line_case();
     auto bt_root = create_line_case_expected_tree();
     compare_trees(root, bt_root.get());
 }
 
-TEST_F(RedBlackTreeTest, TriangleCase)
+TEST_F(RedBlackTreeTest, TriangleCaseInsertion)
 {
     create_triangle_case();
     auto bt_root = create_triangle_case_expected_tree();
     compare_trees(root, bt_root.get());
 }
 
+TEST_F(RedBlackTreeTest, PreservesRedBlackTreeProperies)
+{
+    create_random_rb_tree(rand() % 100'000 + 100'000);
+    test_rb_tree_properties();
+}

@@ -113,15 +113,13 @@ private:
     void rotate()
     {
         RedBlackTree *&opposite_dir_child = get_child<opposite(dir)>();
-        if (parent) {
-            if (is_left())
-                parent->left = opposite_dir_child;
-            else
-                parent->right = opposite_dir_child;
-        }
+        if (parent)
+            parent->get_child(get_dir()) = opposite_dir_child;
         opposite_dir_child->parent = parent;
         parent = opposite_dir_child;
         opposite_dir_child = opposite_dir_child->get_child<dir>();
+        if (opposite_dir_child)
+            opposite_dir_child->parent = this;
         parent->get_child<dir>() = this;
     }
 
