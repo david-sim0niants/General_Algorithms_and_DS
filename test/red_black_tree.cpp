@@ -218,13 +218,9 @@ void RedBlackTreeTest::print_rbtree(RedBlackTree<int> *root, int depth)
         return;
     }
 
-    if (root->value % 100 == 73 && depth == 4) {
-        compare_trees(nullptr, nullptr);
-    }
-
-    print_rbtree(root->get_left(), depth + 1);
-    std::cout << std::string(depth, '\t') << (root->is_black() ? "\033[37mB" : "\033[31mR") + std::to_string(depth) + "\033[0m" << std::endl;
     print_rbtree(root->get_right(), depth + 1);
+    std::cout << std::string(depth, '\t') << (root->is_black() ? "\033[37mB" : "\033[31mR") + std::to_string(depth) + "\033[0m" << std::endl;
+    print_rbtree(root->get_left(), depth + 1);
 }
 
 
@@ -259,5 +255,17 @@ TEST_F(RedBlackTreeTest, TriangleCaseInsertion)
 TEST_F(RedBlackTreeTest, PreservesRedBlackTreeProperies)
 {
     create_random_rb_tree(rand() % 100'000 + 100'000);
+    test_rb_tree_properties();
+}
+
+TEST_F(RedBlackTreeTest, RedBlackCaseRemoval)
+{
+    create_triangle_case();
+    root = root->get_root();
+    print_rbtree(root);
+    root->get_right()->remove();
+    root = root->get_root();
+    std::cout << "--------------------------\n";
+    print_rbtree(root);
     test_rb_tree_properties();
 }
