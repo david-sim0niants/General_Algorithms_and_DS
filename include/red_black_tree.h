@@ -81,7 +81,7 @@ public:
             replacer_node = this; // treating the deleted node as a temporary NIL node
         }
 
-        if (color == Color::Black && replacer_node->color == Color::Black)
+        if (color == Color::Black)
             replacer_node->remove_fixup();
 
         // either the deleted node is red and the replacer node is already black
@@ -268,7 +268,7 @@ private:
 
     RedBlackTree *remove_fixup_step()
     {
-        if (is_root()) {
+        if (is_root() || is_red()) {
             color = Color::Black;
             return nullptr;
         }

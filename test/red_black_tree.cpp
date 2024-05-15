@@ -35,10 +35,16 @@ protected:
     void create_line_case();
     void create_triangle_case();
 
+    void create_red_node_removal_case();
+    void create_red_sibling_case();
+
     static std::unique_ptr<BinaryTree> create_initial_state_expected_tree();
     static std::unique_ptr<BinaryTree> create_red_uncle_case_expected_tree();
     static std::unique_ptr<BinaryTree> create_line_case_expected_tree();
     static std::unique_ptr<BinaryTree> create_triangle_case_expected_tree();
+
+    static std::unique_ptr<BinaryTree> create_red_node_removal_case_expected_tree();
+    static std::unique_ptr<BinaryTree> create_red_sibling_case_expected_tree();
 
     void create_random_rb_tree(int nr_nodes);
 
@@ -69,7 +75,7 @@ void RedBlackTreeTest::delete_node(RedBlackTree<int> *node)
 void RedBlackTreeTest::compare_trees(RedBlackTree<int> *rb_root, BinaryTree *bt_root)
 {
     EXPECT_EQ(rb_root != nullptr, bt_root != nullptr);
-    if (!rb_root)
+    if (!rb_root || !bt_root)
         return;
     EXPECT_EQ(rb_root->value, bt_root->value);
     if (bt_root->color == Black)
@@ -107,6 +113,24 @@ void RedBlackTreeTest::create_triangle_case()
     create_line_case();
     root->get_left()->insert_left(create_node(-2));
     root->get_left()->get_left()->insert_right(create_node(-1));
+    root = root->get_root();
+}
+
+void RedBlackTreeTest::create_red_node_removal_case()
+{
+    create_triangle_case();
+    root->get_right()->get_right()->remove();
+    root = root->get_root();
+}
+
+void RedBlackTreeTest::create_red_sibling_case()
+{
+    create_triangle_case();
+    root->get_right()->get_right()->insert_right(create_node(5));
+    root = root->get_root();
+    root->get_left()->get_left()->remove();
+    root->get_left()->get_right()->remove();
+    root->get_left()->remove();
     root = root->get_root();
 }
 
@@ -149,6 +173,29 @@ std::unique_ptr<RedBlackTreeTest::BinaryTree> RedBlackTreeTest::create_triangle_
             make_bt(3, Black,
                 make_bt(2, Red),
                 make_bt(4, Red)));
+}
+
+std::unique_ptr<RedBlackTreeTest::BinaryTree> RedBlackTreeTest::create_red_node_removal_case_expected_tree()
+{
+    return
+        make_bt(1, Black,
+            make_bt(-1, Black,
+                make_bt(-2, Red),
+                make_bt(0, Red)),
+            make_bt(3, Black,
+                make_bt(2, Red)));
+}
+
+std::unique_ptr<RedBlackTreeTest::BinaryTree> RedBlackTreeTest::create_red_sibling_case_expected_tree()
+{
+    return
+        make_bt(3, Black,
+            make_bt(1, Black,
+                nullptr,
+                make_bt(2, Red)),
+            make_bt(4, Black,
+                nullptr,
+                make_bt(5, Red)));
 }
 
 void RedBlackTreeTest::create_random_rb_tree(int nr_nodes)
@@ -219,7 +266,7 @@ void RedBlackTreeTest::print_rbtree(RedBlackTree<int> *root, int depth)
     }
 
     print_rbtree(root->get_right(), depth + 1);
-    std::cout << std::string(depth, '\t') << (root->is_black() ? "\033[37mB" : "\033[31mR") + std::to_string(depth) + "\033[0m" << std::endl;
+    std::cout << std::string(depth, '\t') << (root->is_black() ? "\033[37mB" : "\033[31mR") + std::to_string(root->value) + "\033[0m" << std::endl;
     print_rbtree(root->get_left(), depth + 1);
 }
 
@@ -260,12 +307,14 @@ TEST_F(RedBlackTreeTest, PreservesRedBlackTreeProperies)
 
 TEST_F(RedBlackTreeTest, RedBlackCaseRemoval)
 {
-    create_triangle_case();
-    root = root->get_root();
-    print_rbtree(root);
-    root->get_right()->remove();
-    root = root->get_root();
-    std::cout << "--------------------------\n";
-    print_rbtree(root);
-    test_rb_tree_properties();
+    create_red_node_removal_case();
+    auto bt_root = create_red_node_removal_case_expected_tree();
+    compare_trees(root, bt_root.get());
+}
+
+TEST_F(RedBlackTreeTest, RedSiblingCaseRemoval)
+{
+    create_red_sibling_case();
+    auto bt_root = create_red_sibling_case_expected_tree();
+    compare_trees(root, bt_root.get());
 }
