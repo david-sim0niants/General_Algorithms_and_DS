@@ -3,18 +3,40 @@
 #include <utility>
 #include <type_traits>
 
+/* Red-Black Tree data structure, responsible for keeping the binary search tree balanced,
+ * providing the insert_left(), insert_right(), and remove() operations.
+ * It's not responsible for searching for the elements, finding the correct place to insert them,
+ * or finding the matching node to remove them.
+ * It's also not responsible for allocating node data or managing nodes' memory.
+ *
+ * To insert a new node under an existing node, first create the new node,
+ * call insert_left() or insert_right() on the existing node (depending on where you decide to put it),
+ * and pass the pointer to the newly created node. As after insertion and re-balancing the root may have changed,
+ * call get_root() on the root node to find the new root of the tree.
+ * Make sure the new node stays alive as long as it has not been removed from the tree.
+ * The tree is not responsible for managing node's memory.
+ *
+ * To remove a node, simply call remove() on the existing node and get_root() on the root to find the new root.
+ * Calling remove() on a root node that has children may result in losing access to the rest of the tree.
+ * In that case keep one of root node's children temporarily and after removing call get_root() on it
+ * to traverse back to the new root. Note, if the root has no children, you're removing the last node of the tree.
+ * */
 template<typename T>
 class RedBlackTree {
 private:
+    /* Color enum. */
     enum class Color : char {
         Black = 0, Red = 1
     };
 
+    /* This enum is used to specify if the node is a left or right child of its parent,
+     * and for specifying in which direction to rotate the node. */
     enum class Direction {
         Left = 0, Right = 1
     };
 
 public:
+    /* Default constructor. Only possible if the value type is default-constructible. */
     RedBlackTree() = default;
 
     RedBlackTree(T&& value) : value(std::move(value))
@@ -23,10 +45,12 @@ public:
     RedBlackTree(const T& value) : value(value)
     {}
 
+    /* Emplace constructor. Takes arguments needed to construct the value. */
     template<typename ...Args>
     RedBlackTree(Args&&... args) : value(std::forward<Args>(args)...)
     {}
 
+    /* Insert node to the left of this node. */
     void insert_left(RedBlackTree *node)
     {
         insert_common(node);
@@ -34,6 +58,7 @@ public:
         node->insert_fixup();
     }
 
+    /* Insert node to the right of this node. */
     void insert_right(RedBlackTree *node)
     {
         insert_common(node);
@@ -41,6 +66,7 @@ public:
         node->insert_fixup();
     }
 
+    /* Remove 'this' node. */
     void remove()
     {
         if (left && right) {
@@ -134,6 +160,7 @@ public:
         return parent;
     }
 
+    /* Find the root of the tree. */
     inline RedBlackTree *get_root()
     {
         RedBlackTree *node = this;
@@ -143,29 +170,20 @@ public:
     }
 
 private:
-    template<Direction dir>
-    RedBlackTree(T&& value, Color color = Color::Red, RedBlackTree *parent = nullptr)
-        : value(std::move(value)), color(color), left(nullptr), right(nullptr), parent(parent)
-    {
-        if (parent) {
-            if constexpr (dir == Direction::Left)
-                parent->left = this;
-            else
-                parent->right = this;
-        }
-    }
-
+    /* Find the opposite direction. */
     inline static constexpr Direction opposite(Direction dir)
     {
         return static_cast<Direction>( ! static_cast<std::underlying_type_t<Direction>>(dir));
     }
 
+    /* Initialize the new node to be red and its parent to be 'this'. */
     void insert_common(RedBlackTree *node)
     {
         node->parent = this;
         node->color = Color::Red;
     }
 
+    /* Rotate this node left or right (compile-time). */
     template<Direction dir>
     void rotate()
     {
@@ -180,6 +198,7 @@ private:
         parent->get_child<dir>() = this;
     }
 
+    /* Rotate this node left or right (run-time). */
     void rotate(Direction dir)
     {
         if (dir == Direction::Left)
@@ -219,12 +238,15 @@ private:
         return is_left() ? Direction::Left : Direction::Right;
     }
 
+    /* Post-insert balancing operation. */
     void insert_fixup()
     {
         RedBlackTree *node = this;
         while ((node = node->insert_fixup_step()));
     }
 
+    /* Perform one step of insertion fix-up.
+     * Return the next node to operate on, or null if nothing else should be done. */
     RedBlackTree *insert_fixup_step()
     {
         if (is_root()) {
@@ -236,16 +258,16 @@ private:
 
         const Direction parent_dir = parent->get_dir();
         RedBlackTree *uncle = parent->parent->get_child(opposite(parent_dir));
-        if (uncle && uncle->is_red()) {
+        if (uncle && uncle->is_red()) { // red uncle case
             uncle->color = Color::Black;
             parent->color = Color::Black;
             parent->parent->color = Color::Red;
             return parent->parent;
-        } else if (parent_dir != get_dir()) {
+        } else if (parent_dir != get_dir()) { // black uncle case with a triangle formed
             RedBlackTree *former_parent = parent;
             parent->rotate(opposite(get_dir()));
             return former_parent;
-        } else {
+        } else { // black uncle case with a line formed
             parent->color = Color::Black;
             parent->parent->color = Color::Red;
             parent->parent->rotate(opposite(get_dir()));
@@ -253,6 +275,7 @@ private:
         }
     }
 
+    /* Makes the replacer node parent to be 'this' node's parent. */
     inline void transplant(RedBlackTree *replacer) const
     {
         replacer->parent = parent;
@@ -260,12 +283,15 @@ private:
             parent->get_child(get_dir()) = replacer;
     }
 
+    /* Post-remove balancing operation. */
     void remove_fixup()
     {
         RedBlackTree *node = this;
         while ((node = node->remove_fixup_step()));
     }
 
+    /* Perform one step of removal fix-up.
+     * Return the next node to operate on, or null if nothing else should be done. */
     RedBlackTree *remove_fixup_step()
     {
         if (is_root() || is_red()) {
@@ -276,22 +302,25 @@ private:
         Direction dir = get_dir();
         Direction sibling_dir = opposite(dir);
         RedBlackTree *sibling = parent->get_child(sibling_dir);
-        if (sibling->is_red()) {
+        if (sibling->is_red()) { // Red sibling case
             sibling->color = Color::Black;
             parent->color = Color::Red;
             parent->rotate(dir);
             return this;
         } else if ((!sibling->left || sibling->left->is_black())
                 && (!sibling->right || sibling->right->is_black())) {
+            // Black sibling with both children black case
             sibling->color = Color::Red;
             return parent;
         } else if (!sibling->get_child(sibling_dir)
                 || sibling->get_child(sibling_dir)->is_black()) {
+            // A case when the black sibling's child, the direction of which matches the direction of the sibling, is black.
             sibling->get_child(dir)->color = Color::Black;
             sibling->color = Color::Red;
             sibling->rotate(sibling_dir);
             return this;
         } else {
+            // A case when the black sibling's child, the direction of which matches the direction of the sibling, is red.
             sibling->color = parent->color;
             parent->color = Color::Black;
             sibling->get_child(sibling_dir)->color = Color::Black;
@@ -304,7 +333,7 @@ private:
     }
 
 public:
-    T value;
+    T value; /* Value is exposed publicly as the red-black tree doesn't even use it. */
 private:
     Color color = Color::Black;
     RedBlackTree *left = nullptr, *right = nullptr, *parent = nullptr;

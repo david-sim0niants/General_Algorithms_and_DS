@@ -37,6 +37,9 @@ protected:
 
     void create_red_node_removal_case();
     void create_red_sibling_case();
+    void create_black_sibling_with_black_children_case();
+    void create_black_sibling_with_black_child_line_formed_case();
+    void create_black_sibling_with_red_child_line_formed_case();
 
     static std::unique_ptr<BinaryTree> create_initial_state_expected_tree();
     static std::unique_ptr<BinaryTree> create_red_uncle_case_expected_tree();
@@ -45,6 +48,9 @@ protected:
 
     static std::unique_ptr<BinaryTree> create_red_node_removal_case_expected_tree();
     static std::unique_ptr<BinaryTree> create_red_sibling_case_expected_tree();
+    static std::unique_ptr<BinaryTree> create_black_sibling_with_black_children_case_expected_tree();
+    static std::unique_ptr<BinaryTree> create_black_sibling_with_black_child_line_formed_case_expected_tree();
+    static std::unique_ptr<BinaryTree> create_black_sibling_with_red_child_line_formed_case_expected_tree();
 
     void create_random_rb_tree(int nr_nodes);
 
@@ -134,6 +140,31 @@ void RedBlackTreeTest::create_red_sibling_case()
     root = root->get_root();
 }
 
+void RedBlackTreeTest::create_black_sibling_with_black_children_case()
+{
+    create_red_uncle_case();
+    root->get_right()->get_right()->remove();
+    root->get_right()->remove();
+    root = root->get_root();
+}
+
+void RedBlackTreeTest::create_black_sibling_with_black_child_line_formed_case()
+{
+    root = create_node(1);
+    root->insert_left(create_node(0));
+    root->insert_right(create_node(3));
+    root->get_right()->insert_left(create_node(2));
+    root->get_left()->remove();
+    root = root->get_root();
+}
+
+void RedBlackTreeTest::create_black_sibling_with_red_child_line_formed_case()
+{
+    create_red_uncle_case();
+    root->get_left()->remove();
+    root = root->get_root();
+}
+
 std::unique_ptr<RedBlackTreeTest::BinaryTree> RedBlackTreeTest::create_initial_state_expected_tree()
 {
     return
@@ -196,6 +227,29 @@ std::unique_ptr<RedBlackTreeTest::BinaryTree> RedBlackTreeTest::create_red_sibli
             make_bt(4, Black,
                 nullptr,
                 make_bt(5, Red)));
+}
+
+std::unique_ptr<RedBlackTreeTest::BinaryTree> RedBlackTreeTest::create_black_sibling_with_black_children_case_expected_tree()
+{
+    return
+        make_bt(1, Black,
+            make_bt(0, Red));
+}
+
+std::unique_ptr<RedBlackTreeTest::BinaryTree> RedBlackTreeTest::create_black_sibling_with_black_child_line_formed_case_expected_tree()
+{
+    return
+        make_bt(2, Black,
+            make_bt(1, Black),
+            make_bt(3, Black));
+}
+
+std::unique_ptr<RedBlackTreeTest::BinaryTree> RedBlackTreeTest::create_black_sibling_with_red_child_line_formed_case_expected_tree()
+{
+    return
+        make_bt(2, Black,
+            make_bt(1, Black),
+            make_bt(3, Black));
 }
 
 void RedBlackTreeTest::create_random_rb_tree(int nr_nodes)
@@ -299,7 +353,7 @@ TEST_F(RedBlackTreeTest, TriangleCaseInsertion)
     compare_trees(root, bt_root.get());
 }
 
-TEST_F(RedBlackTreeTest, PreservesRedBlackTreeProperies)
+TEST_F(RedBlackTreeTest, PreservesRedBlackTreePropertiesDuringInsertion)
 {
     create_random_rb_tree(rand() % 100'000 + 100'000);
     test_rb_tree_properties();
@@ -317,4 +371,39 @@ TEST_F(RedBlackTreeTest, RedSiblingCaseRemoval)
     create_red_sibling_case();
     auto bt_root = create_red_sibling_case_expected_tree();
     compare_trees(root, bt_root.get());
+}
+
+TEST_F(RedBlackTreeTest, BlackSiblingWithBothChildrenBlackCaseRemoval)
+{
+    create_black_sibling_with_black_children_case();
+    auto bt_root = create_black_sibling_with_black_children_case_expected_tree();
+    compare_trees(root, bt_root.get());
+}
+
+TEST_F(RedBlackTreeTest, BlackSiblingWithBlackChildLineFormedCaseRemoval)
+{
+    create_black_sibling_with_black_child_line_formed_case();
+    auto bt_root = create_black_sibling_with_black_child_line_formed_case_expected_tree();
+    compare_trees(root, bt_root.get());
+}
+
+TEST_F(RedBlackTreeTest, BlackSiblingWithRedChildLineFormedCaseRemoval)
+{
+    create_black_sibling_with_red_child_line_formed_case();
+    auto bt_root = create_black_sibling_with_red_child_line_formed_case_expected_tree();
+    compare_trees(root, bt_root.get());
+}
+
+TEST_F(RedBlackTreeTest, PreservesRedBlackTreePropertiesDuringRemoval)
+{
+    create_random_rb_tree(rand() % 10'000 + 10'000);
+    int nr_attempts = 1000;
+    while (nr_attempts--) {
+        RedBlackTree<int> *node = nodes_container.begin()->first;
+        RedBlackTree<int> *child = root->get_left() ? root->get_left() : root->get_right();
+        node->remove();
+        if (node == root)
+            root = child ? child->get_root() : nullptr;
+        test_rb_tree_properties();
+    }
 }
