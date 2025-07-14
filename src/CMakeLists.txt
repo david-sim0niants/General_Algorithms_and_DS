@@ -19,3 +19,7 @@ target_include_directories(${TARGET_NAME} INTERFACE ${MAIN_INCLUDE_DIR})
 set(TARGET_NAME red_black_tree)
 add_library(${TARGET_NAME} INTERFACE)
 target_include_directories(${TARGET_NAME} INTERFACE ${MAIN_INCLUDE_DIR})
+
+set(TARGET_NAME bloom_filter)
+add_library(${TARGET_NAME} INTERFACE)
+target_include_directories(${TARGET_NAME} INTERFACE ${MAIN_INCLUDE_DIR})
